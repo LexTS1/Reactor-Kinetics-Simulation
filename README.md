@@ -10,4 +10,4 @@ ___
 ___
 ## Disclaimer
 
-This project is an educational reactor kinetics and visualization tool. It uses a reduced-order point kinetics model with delayed neutron groups and simplified thermal feedback to simulate transient reactor behaviour. The 3D PWR core representation is a visualization layer, not a full spatial neutronics or thermal-hydraulic model.
+This project is an educational reactor kinetics and visualisation tool. It uses a reduced-order point kinetics model with delayed neutron groups and simplified thermal feedback to simulate transient reactor behaviour. The 3D PWR core representation is a visualisation layer, not a full spatial neutronics or thermal-hydraulic model.
