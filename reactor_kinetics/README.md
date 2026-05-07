@@ -13,6 +13,7 @@ concentrations `C_i` represent radioactive fission products that later emit
 delayed neutrons.
 
 The six-group point-kinetics equations are:
+
 ```text
 dn/dt = ((rho(t) - beta_eff) / Lambda) n + sum(lambda_i C_i)
 
@@ -27,6 +28,7 @@ seconds, and `lambda_i` are precursor decay constants in `1/s`.
 
 At critical steady state, `rho = 0` and power is steady. For `n0 = 1`, the
 critical precursor inventory is initialized as:
+
 ```text
 C_i0 = beta_i / (Lambda lambda_i) n0
 ```
@@ -43,6 +45,7 @@ The regimes demonstrated by the MVP are:
 ## Thermal Feedback
 
 The optional lumped thermal model tracks fuel and moderator temperatures:
+
 ```text
 Cf dTf/dt = P(t) - Hfm (Tf - Tm)
 
@@ -50,6 +53,7 @@ Cm dTm/dt = Hfm (Tf - Tm) - Hmc (Tm - Tc)
 ```
 
 Temperature feedback is coupled into reactivity as:
+
 ```text
 rho_feedback = alpha_f (Tf - Tf0) + alpha_m (Tm - Tm0)
 ```
@@ -60,16 +64,25 @@ rise heats the fuel and moderator, which inserts negative reactivity.
 ## Running The MVP
 
 Install the required Python packages if needed:
+
 ```bash
-pip install numpy scipy matplotlib
+pip install numpy scipy matplotlib pyyaml pytest
 ```
 
 Run all demonstration cases:
+
 ```bash
 python examples/run_mvp.py
 ```
 
+If your system does not provide a `python` executable, use:
+
+```bash
+python3 examples/run_mvp.py
+```
+
 The script runs:
+
 - delayed-supercritical positive step insertion,
 - negative step insertion,
 - prompt-supercritical insertion,
@@ -81,6 +94,44 @@ relative power, delayed neutron precursor concentrations, and reactivity. The
 thermal-feedback case also shows fuel and moderator temperatures.
 
 To save plots instead of only showing them:
+
 ```bash
 python examples/run_mvp.py --save-dir examples/output
+```
+
+## Phase 2 Validation
+
+The numerical model is validated against expected point-kinetics behaviour.
+The validation uses representative, educational PWR-like U-235 kinetics
+parameters from `configs/pwr_reference.yaml`. These values are not
+plant-specific licensed data and must not be used for safety analysis.
+
+Run the validation script from the repository root:
+
+```bash
+python examples/run_validation.py
+```
+
+If your system does not provide a `python` executable, use:
+
+```bash
+python3 examples/run_validation.py
+```
+
+The script prints a concise validation report and saves clean PNG plots to:
+
+```text
+validation/outputs/
+```
+
+Run the automated tests with:
+
+```bash
+pytest
+```
+
+If the `pytest` console script is not on `PATH`, use:
+
+```bash
+python3 -m pytest
 ```
