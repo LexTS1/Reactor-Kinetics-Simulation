@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
@@ -9,7 +11,31 @@ from matplotlib.figure import Figure
 from .solver import SimulationResult
 
 
-def plot_neutron_population(result: SimulationResult) -> Figure:
+def _finalize_figure(
+    fig: Figure,
+    save_path: str | Path | None = None,
+    show: bool = False,
+    close: bool = False,
+) -> Figure:
+    """Save, show, and/or close a Matplotlib figure."""
+
+    if save_path is not None:
+        output_path = Path(save_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=160)
+    if show:
+        plt.show()
+    if close:
+        plt.close(fig)
+    return fig
+
+
+def plot_neutron_population(
+    result: SimulationResult,
+    save_path: str | Path | None = None,
+    show: bool = False,
+    close: bool = False,
+) -> Figure:
     """Plot neutron population / relative power."""
 
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -20,10 +46,15 @@ def plot_neutron_population(result: SimulationResult) -> Figure:
     ax.grid(True, alpha=0.3)
     ax.legend()
     fig.tight_layout()
-    return fig
+    return _finalize_figure(fig, save_path=save_path, show=show, close=close)
 
 
-def plot_log_neutron_population(result: SimulationResult) -> Figure:
+def plot_log_neutron_population(
+    result: SimulationResult,
+    save_path: str | Path | None = None,
+    show: bool = False,
+    close: bool = False,
+) -> Figure:
     """Plot neutron population / relative power on a logarithmic axis."""
 
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -35,10 +66,15 @@ def plot_log_neutron_population(result: SimulationResult) -> Figure:
     ax.grid(True, which="both", alpha=0.3)
     ax.legend()
     fig.tight_layout()
-    return fig
+    return _finalize_figure(fig, save_path=save_path, show=show, close=close)
 
 
-def plot_precursors(result: SimulationResult) -> Figure:
+def plot_precursors(
+    result: SimulationResult,
+    save_path: str | Path | None = None,
+    show: bool = False,
+    close: bool = False,
+) -> Figure:
     """Plot delayed neutron precursor concentrations."""
 
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -50,10 +86,15 @@ def plot_precursors(result: SimulationResult) -> Figure:
     ax.grid(True, alpha=0.3)
     ax.legend(ncol=3)
     fig.tight_layout()
-    return fig
+    return _finalize_figure(fig, save_path=save_path, show=show, close=close)
 
 
-def plot_reactivity(result: SimulationResult) -> Figure:
+def plot_reactivity(
+    result: SimulationResult,
+    save_path: str | Path | None = None,
+    show: bool = False,
+    close: bool = False,
+) -> Figure:
     """Plot net reactivity."""
 
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -66,10 +107,15 @@ def plot_reactivity(result: SimulationResult) -> Figure:
     ax.grid(True, alpha=0.3)
     ax.legend()
     fig.tight_layout()
-    return fig
+    return _finalize_figure(fig, save_path=save_path, show=show, close=close)
 
 
-def plot_temperatures(result: SimulationResult) -> Figure:
+def plot_temperatures(
+    result: SimulationResult,
+    save_path: str | Path | None = None,
+    show: bool = False,
+    close: bool = False,
+) -> Figure:
     """Plot fuel and moderator temperatures for thermal-feedback results."""
 
     if not result.has_thermal_feedback:
@@ -84,10 +130,15 @@ def plot_temperatures(result: SimulationResult) -> Figure:
     ax.grid(True, alpha=0.3)
     ax.legend()
     fig.tight_layout()
-    return fig
+    return _finalize_figure(fig, save_path=save_path, show=show, close=close)
 
 
-def plot_summary(result: SimulationResult) -> Figure:
+def plot_summary(
+    result: SimulationResult,
+    save_path: str | Path | None = None,
+    show: bool = False,
+    close: bool = False,
+) -> Figure:
     """Create a multi-panel summary plot for one simulation result."""
 
     panel_count = 5 if result.has_thermal_feedback else 4
@@ -136,4 +187,4 @@ def plot_summary(result: SimulationResult) -> Figure:
 
     axes[-1].set_xlabel("Time [s]")
     fig.tight_layout()
-    return fig
+    return _finalize_figure(fig, save_path=save_path, show=show, close=close)
