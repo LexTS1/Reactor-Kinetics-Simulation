@@ -9,7 +9,7 @@ _source: [EnergyEncyclopedia](https://www.energyencyclopedia.com/en/free-downloa
 ___
 ## Ideal Final Product
 
-> An interactive web-based PWR-inspired reactor core simulator where users adjust control rod insertion, boron concentration, moderator temperature, fuel temperature, and reactor parameters, while the app computes simplified point-kinetics transients and visualizes power, reactivity, neutron flux, and thermal feedback in real time.
+> An interactive web-based PWR-inspired reactor core simulator where users adjust control rod insertion, boron concentration, moderator temperature, fuel temperature, and reactor parameters, while the app computes simplified point-kinetics transients and visualises power, reactivity, neutron flux, and thermal feedback in real time.
 ___
 ## Disclaimer
 
