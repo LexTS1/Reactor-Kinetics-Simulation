@@ -2,7 +2,9 @@
 
 Implementing point kinetics equations for neutron population dynamics by simulating step and ramp reactivity insertions and transient reactor behaviour in a PWR.
 
-Simplified educational model. Not suitable for reactor design, licensing, safety analysis, or plant operation.
+<img width="1280" height="720" alt="pwr_3D" src="https://github.com/user-attachments/assets/0393b138-9681-4239-81c5-ba03aeac17ac" />
+_source: [EnergyEncyclopedia](https://www.energyencyclopedia.com/en/free-downloads/3d-printing/pwr-nuclear-reactor-11)_
+
 ___
 ## Ideal Final Product
 
@@ -10,4 +12,4 @@ ___
 ___
 ## Disclaimer
 
-This project is an educational reactor kinetics and visualisation tool. It uses a reduced-order point kinetics model with delayed neutron groups and simplified thermal feedback to simulate transient reactor behaviour. The 3D PWR core representation is a visualisation layer, not a full spatial neutronics or thermal-hydraulic model.
+This project is an educational reactor kinetics and visualisation tool. It is a simplified educational model that uses a reduced-order point kinetics model with delayed neutron groups and simplified thermal feedback to simulate transient reactor behaviour. The 3D PWR core representation is a visualisation layer and is not suitable for reactor design, licensing, safety analysis, or plant operation.
