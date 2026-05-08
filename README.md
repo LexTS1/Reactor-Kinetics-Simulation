@@ -3,6 +3,7 @@
 Implementing point kinetics equations for neutron population dynamics by simulating step and ramp reactivity insertions and transient reactor behaviour in a PWR.
 
 <img width="1280" height="720" alt="pwr_3D" src="https://github.com/user-attachments/assets/0393b138-9681-4239-81c5-ba03aeac17ac" />
+
 _source: [EnergyEncyclopedia](https://www.energyencyclopedia.com/en/free-downloads/3d-printing/pwr-nuclear-reactor-11)_
 
 ___
