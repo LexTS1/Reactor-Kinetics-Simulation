@@ -10,7 +10,9 @@ from typing import Any
 import numpy as np
 import yaml
 
-from .point_kinetics import KineticsParameters, ThermalFeedbackParameters
+from .point_kinetics import KineticsParameters
+from .reactivity import ReactivityCoefficients
+from .thermal import ThermalParameters
 
 
 @dataclass(frozen=True)
@@ -21,7 +23,8 @@ class ReactorConfig:
     description: str
     kinetics: KineticsParameters
     thermal_enabled: bool
-    thermal: ThermalFeedbackParameters | None = None
+    thermal: ThermalParameters | None = None
+    reactivity: ReactivityCoefficients | None = None
 
 
 def _require_mapping(data: Mapping[str, Any], key: str) -> Mapping[str, Any]:
@@ -58,6 +61,25 @@ def _require_positive_float(data: Mapping[str, Any], key: str) -> float:
     return number
 
 
+def _require_float_alias(data: Mapping[str, Any], *keys: str) -> float:
+    for key in keys:
+        if key in data:
+            return _require_float(data, key)
+    raise ValueError(
+        "configuration field must include one of: " + ", ".join(f"'{key}'" for key in keys)
+    )
+
+
+def _require_positive_float_alias(data: Mapping[str, Any], *keys: str) -> float:
+    number = _require_float_alias(data, *keys)
+    if number <= 0.0:
+        raise ValueError(
+            "configuration field must be positive for one of: "
+            + ", ".join(f"'{key}'" for key in keys)
+        )
+    return number
+
+
 def _require_float_array(data: Mapping[str, Any], key: str) -> np.ndarray:
     value = data.get(key)
     if not isinstance(value, list):
@@ -85,7 +107,7 @@ def _load_kinetics(data: Mapping[str, Any]) -> KineticsParameters:
     return params
 
 
-def _load_thermal(data: Mapping[str, Any]) -> tuple[bool, ThermalFeedbackParameters | None]:
+def _load_thermal(data: Mapping[str, Any]) -> tuple[bool, ThermalParameters | None]:
     thermal = data.get("thermal")
     if thermal is None:
         return False, None
@@ -98,19 +120,85 @@ def _load_thermal(data: Mapping[str, Any]) -> tuple[bool, ThermalFeedbackParamet
     if not enabled:
         return False, None
 
-    thermal_params = ThermalFeedbackParameters(
-        fuel_heat_capacity=_require_positive_float(thermal, "Cf"),
-        moderator_heat_capacity=_require_positive_float(thermal, "Cm"),
-        fuel_moderator_heat_transfer=_require_positive_float(thermal, "Hfm"),
-        moderator_coolant_heat_transfer=_require_positive_float(thermal, "Hmc"),
-        coolant_temperature=_require_positive_float(thermal, "Tc"),
-        initial_fuel_temperature=_require_positive_float(thermal, "Tf0"),
-        initial_moderator_temperature=_require_positive_float(thermal, "Tm0"),
-        fuel_temperature_coefficient=_require_float(thermal, "alpha_f"),
-        moderator_temperature_coefficient=_require_float(thermal, "alpha_m"),
-        nominal_power=_require_positive_float(thermal, "power_scale"),
+    thermal_params = ThermalParameters(
+        fuel_heat_capacity=_require_positive_float_alias(
+            thermal,
+            "fuel_heat_capacity",
+            "Cf",
+        ),
+        moderator_heat_capacity=_require_positive_float_alias(
+            thermal,
+            "moderator_heat_capacity",
+            "Cm",
+        ),
+        fuel_moderator_htc=_require_positive_float_alias(
+            thermal,
+            "fuel_moderator_htc",
+            "Hfm",
+        ),
+        moderator_coolant_htc=_require_positive_float_alias(
+            thermal,
+            "moderator_coolant_htc",
+            "Hmc",
+        ),
+        coolant_temperature=_require_positive_float_alias(
+            thermal,
+            "coolant_temperature",
+            "Tc",
+        ),
+        reference_fuel_temperature=_require_positive_float_alias(
+            thermal,
+            "reference_fuel_temperature",
+            "Tf0",
+        ),
+        reference_moderator_temperature=_require_positive_float_alias(
+            thermal,
+            "reference_moderator_temperature",
+            "Tm0",
+        ),
+        power_scale=_require_positive_float(thermal, "power_scale"),
+        fuel_temperature_coefficient=(
+            _require_float(thermal, "alpha_f") if "alpha_f" in thermal else None
+        ),
+        moderator_temperature_coefficient=(
+            _require_float(thermal, "alpha_m") if "alpha_m" in thermal else None
+        ),
     )
     return True, thermal_params
+
+
+def _load_reactivity(data: Mapping[str, Any]) -> ReactivityCoefficients | None:
+    reactivity = data.get("reactivity")
+    if reactivity is None:
+        return None
+    if not isinstance(reactivity, Mapping):
+        raise ValueError("configuration field 'reactivity' must be a mapping.")
+
+    return ReactivityCoefficients(
+        reference_rod_insertion_fraction=_require_float(
+            reactivity,
+            "reference_rod_insertion_fraction",
+        ),
+        total_control_rod_worth=_require_positive_float(
+            reactivity,
+            "total_control_rod_worth",
+        ),
+        reference_boron_ppm=_require_float(reactivity, "reference_boron_ppm"),
+        boron_worth_pcm_per_ppm=_require_positive_float(
+            reactivity,
+            "boron_worth_pcm_per_ppm",
+        ),
+        reference_fuel_temperature=_require_positive_float(
+            reactivity,
+            "reference_fuel_temperature",
+        ),
+        reference_moderator_temperature=_require_positive_float(
+            reactivity,
+            "reference_moderator_temperature",
+        ),
+        alpha_fuel=_require_float(reactivity, "alpha_fuel"),
+        alpha_moderator=_require_float(reactivity, "alpha_moderator"),
+    )
 
 
 def load_reactor_config(path: str | Path) -> ReactorConfig:
@@ -130,10 +218,12 @@ def load_reactor_config(path: str | Path) -> ReactorConfig:
 
     kinetics = _load_kinetics(loaded)
     thermal_enabled, thermal = _load_thermal(loaded)
+    reactivity = _load_reactivity(loaded)
     return ReactorConfig(
         name=_require_text(loaded, "name"),
         description=_require_text(loaded, "description"),
         kinetics=kinetics,
         thermal_enabled=thermal_enabled,
         thermal=thermal,
+        reactivity=reactivity,
     )

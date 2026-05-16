@@ -1,6 +1,6 @@
 # Representative, educational PWR-like point-kinetics parameters.
-# These values are not plant-specific licensed data and must not be used for reactor design, operation, licensing, or safety analysis.
-
+# These values are not plant-specific licensed data and must not be used for
+# reactor design, operation, licensing, or safety analysis.
 name: "Representative PWR-like U-235 point kinetics parameters"
 description: >
   Educational reference parameters for point-kinetics validation.
@@ -25,13 +25,41 @@ kinetics:
 
 thermal:
   enabled: true
-  Tf0: 900.0
-  Tm0: 580.0
-  Tc: 560.0
-  Cf: 2.0e7
-  Cm: 8.0e7
-  Hfm: 1.0e5
-  Hmc: 8.0e4
-  alpha_f: -3.0e-5
-  alpha_m: -5.0e-5
+
+  reference_fuel_temperature: 900.0
+  reference_moderator_temperature: 580.0
+  coolant_temperature: 560.0
+
+  fuel_heat_capacity: 2.0e7
+  moderator_heat_capacity: 8.0e7
+
+  # Chosen so n = 1.0 is initially near thermal balance at the reference
+  # temperatures: power_scale = Hfm(Tf_ref - Tm_ref) = Hmc(Tm_ref - Tc).
+  fuel_moderator_htc: 9.375e6
+  moderator_coolant_htc: 1.5e8
+
   power_scale: 3.0e9
+
+reactivity:
+  # Representative educational values, not plant-specific safety data.
+  reference_rod_insertion_fraction: 0.5
+  total_control_rod_worth: 0.08
+
+  reference_boron_ppm: 1000.0
+  boron_worth_pcm_per_ppm: 7.0
+
+  reference_fuel_temperature: 900.0
+  reference_moderator_temperature: 580.0
+  alpha_fuel: -3.0e-5
+  alpha_moderator: -5.0e-5
+
+  limits:
+    rod_insertion_fraction:
+      min: 0.0
+      max: 1.0
+    boron_ppm:
+      min: 0.0
+      max: 2500.0
+    external_rho:
+      min: -0.05
+      max: 0.05

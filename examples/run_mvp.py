@@ -19,6 +19,10 @@ os.environ.setdefault(
     str(Path(tempfile.gettempdir()) / "reactor_kinetics_mpl_cache"),
 )
 
+import matplotlib  # noqa: E402
+
+matplotlib.use("Agg")
+
 from matplotlib import pyplot as plt  # noqa: E402
 
 from reactor_kinetics.plotting import plot_summary  # noqa: E402

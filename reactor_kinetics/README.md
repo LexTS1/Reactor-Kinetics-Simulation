@@ -61,6 +61,44 @@ rho_feedback = alpha_f (Tf - Tf0) + alpha_m (Tm - Tm0)
 Negative `alpha_f` and `alpha_m` demonstrate qualitative stabilisation: a power
 rise heats the fuel and moderator, which inserts negative reactivity.
 
+## Reactivity Components
+
+The Phase 3 reactivity model decomposes total reactivity into physically
+interpretable channels:
+
+```text
+rho_total =
+    rho_external
+  + rho_control_rods
+  + rho_boron
+  + rho_fuel_temperature
+  + rho_moderator_temperature
+```
+
+All reactivity values are dimensionless delta-k/k. Control rod insertion uses
+`1.0` for fully inserted and `0.0` for fully withdrawn. Inserting rods adds
+negative reactivity; withdrawing rods adds positive reactivity relative to the
+reference position.
+
+Soluble boron is a neutron absorber, so increasing boron concentration adds
+negative reactivity and dilution adds positive reactivity. Fuel and moderator
+temperature feedback are linearized around reference temperatures. For
+ordinary stabilising feedback, `alpha_fuel < 0` and `alpha_moderator < 0`, so
+temperature increases add negative reactivity. External reactivity remains a
+generic user-defined perturbation.
+
+Run the component examples with:
+
+```bash
+python examples/run_reactivity_components.py
+```
+
+The plots are saved to:
+
+```text
+reactivity_outputs/
+```
+
 ## Running The MVP
 
 Install the required Python packages if needed:

@@ -188,3 +188,50 @@ def plot_summary(
     axes[-1].set_xlabel("Time [s]")
     fig.tight_layout()
     return _finalize_figure(fig, save_path=save_path, show=show, close=close)
+
+
+def plot_thermal_feedback_summary(
+    result: SimulationResult,
+    save_path: str | Path | None = None,
+    show: bool = True,
+    close: bool = False,
+) -> Figure:
+    """Plot power, temperatures, and reactivity components for a coupled case."""
+
+    if not result.has_thermal_feedback:
+        raise ValueError("result does not contain thermal-feedback temperatures.")
+
+    fig, axes = plt.subplots(4, 1, figsize=(9, 11), sharex=True)
+
+    axes[0].plot(result.time, result.neutron_population, color="tab:blue")
+    axes[0].set_ylabel("Relative power [-]")
+    axes[0].set_title(result.title)
+    axes[0].grid(True, alpha=0.3)
+
+    axes[1].plot(result.time, result.fuel_temperature, label="Fuel temperature")
+    axes[1].plot(result.time, result.moderator_temperature, label="Moderator temperature")
+    axes[1].set_ylabel("Temperature [K]")
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend(fontsize="small")
+
+    axes[2].plot(result.time, result.rho_external, label="External")
+    axes[2].plot(result.time, result.rho_fuel_temperature, label="Fuel feedback")
+    axes[2].plot(
+        result.time,
+        result.rho_moderator_temperature,
+        label="Moderator feedback",
+    )
+    axes[2].plot(result.time, result.rho_total, label="Total", linewidth=1.8)
+    axes[2].axhline(0.0, color="black", linewidth=0.8)
+    axes[2].set_ylabel("Reactivity Δk/k [-]")
+    axes[2].grid(True, alpha=0.3)
+    axes[2].legend(fontsize="small", ncol=2)
+
+    positive_power = np.clip(result.neutron_population, 1.0e-300, None)
+    axes[3].semilogy(result.time, positive_power, color="tab:orange")
+    axes[3].set_xlabel("Time [s]")
+    axes[3].set_ylabel("Relative power [-]")
+    axes[3].grid(True, which="both", alpha=0.3)
+
+    fig.tight_layout()
+    return _finalize_figure(fig, save_path=save_path, show=show, close=close)

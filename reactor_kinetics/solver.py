@@ -12,15 +12,16 @@ from scipy.integrate import solve_ivp
 from .point_kinetics import (
     KineticsParameters,
     ReactivityFunction,
-    ThermalFeedbackParameters,
+    coupled_initial_state,
     critical_initial_state,
     default_u235_parameters,
-    initial_state_with_thermal,
+    evaluate_reactivity,
     point_kinetics_rhs,
     point_kinetics_thermal_rhs,
     thermal_feedback_reactivity,
 )
 from .scenarios import zero_reactivity
+from .thermal import ThermalParameters
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ class SimulationResult:
     title: str = "Point-kinetics simulation"
     fuel_temperature: Optional[NDArray[np.float64]] = None
     moderator_temperature: Optional[NDArray[np.float64]] = None
+    reactivity_components: Optional[dict[str, NDArray[np.float64]]] = None
     raw_solution: Any = None
 
     @property
@@ -42,6 +44,83 @@ class SimulationResult:
         """Return True if fuel and moderator temperatures are present."""
 
         return self.fuel_temperature is not None and self.moderator_temperature is not None
+
+    @property
+    def has_reactivity_components(self) -> bool:
+        """Return True if individual reactivity components are present."""
+
+        return self.reactivity_components is not None
+
+    @property
+    def rho_total(self) -> NDArray[np.float64]:
+        """Total reactivity, dimensionless delta-k/k."""
+
+        return self.reactivity
+
+    def _component_or_zero(self, name: str) -> NDArray[np.float64]:
+        if self.reactivity_components is None:
+            return np.zeros_like(self.reactivity)
+        return self.reactivity_components.get(name, np.zeros_like(self.reactivity))
+
+    @property
+    def rho_external(self) -> NDArray[np.float64]:
+        """External reactivity component."""
+
+        return self._component_or_zero("external")
+
+    @property
+    def rho_control_rods(self) -> NDArray[np.float64]:
+        """Control-rod reactivity component."""
+
+        return self._component_or_zero("control_rods")
+
+    @property
+    def rho_boron(self) -> NDArray[np.float64]:
+        """Soluble-boron reactivity component."""
+
+        return self._component_or_zero("boron")
+
+    @property
+    def rho_fuel_temperature(self) -> NDArray[np.float64]:
+        """Fuel-temperature reactivity component."""
+
+        return self._component_or_zero("fuel_temperature")
+
+    @property
+    def rho_moderator_temperature(self) -> NDArray[np.float64]:
+        """Moderator-temperature reactivity component."""
+
+        return self._component_or_zero("moderator_temperature")
+
+    @property
+    def rho_feedback(self) -> NDArray[np.float64]:
+        """Total fuel plus moderator temperature feedback reactivity."""
+
+        return self.rho_fuel_temperature + self.rho_moderator_temperature
+
+
+def _reactivity_components_at_times(
+    reactivity: ReactivityFunction,
+    times: NDArray[np.float64],
+    states: NDArray[np.float64],
+) -> Optional[dict[str, NDArray[np.float64]]]:
+    components_method = getattr(reactivity, "components", None)
+    if not callable(components_method):
+        return None
+
+    component_rows: list[dict[str, float]] = []
+    for index, t in enumerate(times):
+        components = components_method(float(t), states[:, index])
+        if hasattr(components, "as_dict"):
+            component_rows.append(components.as_dict())
+        else:
+            component_rows.append(dict(components))
+
+    keys = sorted({key for row in component_rows for key in row})
+    return {
+        key: np.array([row.get(key, 0.0) for row in component_rows], dtype=float)
+        for key in keys
+    }
 
 
 def _validate_t_eval(
@@ -88,7 +167,7 @@ def solve_point_kinetics(
     t_eval: Optional[Sequence[float] | NDArray[np.float64]] = None,
     initial_state: Optional[Sequence[float] | NDArray[np.float64]] = None,
     n0: float = 1.0,
-    thermal_params: Optional[ThermalFeedbackParameters] = None,
+    thermal_params: Optional[ThermalParameters] = None,
     method: str = "BDF",
     rtol: float = 1.0e-8,
     atol: float | Sequence[float] = 1.0e-10,
@@ -130,7 +209,7 @@ def solve_point_kinetics(
         )
     else:
         if initial_state is None:
-            y0 = initial_state_with_thermal(
+            y0 = coupled_initial_state(
                 params=params,
                 thermal_params=thermal_params,
                 n0=n0,
@@ -142,7 +221,7 @@ def solve_point_kinetics(
             t=t,
             state=y,
             params=params,
-            external_reactivity=reactivity,
+            reactivity=reactivity,
             thermal_params=thermal_params,
         )
 
@@ -168,7 +247,13 @@ def solve_point_kinetics(
     precursors = solution.y[1:7]
 
     if thermal_params is None:
-        reactivity_values = np.array([reactivity(t) for t in solution.t], dtype=float)
+        reactivity_values = np.array(
+            [
+                evaluate_reactivity(reactivity, float(t), solution.y[:, index])
+                for index, t in enumerate(solution.t)
+            ],
+            dtype=float,
+        )
         fuel_temperature = None
         moderator_temperature = None
     else:
@@ -176,7 +261,7 @@ def solve_point_kinetics(
         moderator_temperature = solution.y[8]
         reactivity_values = np.array(
             [
-                reactivity(t)
+                evaluate_reactivity(reactivity, float(t), solution.y[:, index])
                 + thermal_feedback_reactivity(
                     fuel_temperature=fuel_temperature[index],
                     moderator_temperature=moderator_temperature[index],
@@ -186,6 +271,11 @@ def solve_point_kinetics(
             ],
             dtype=float,
         )
+    reactivity_components = _reactivity_components_at_times(
+        reactivity=reactivity,
+        times=solution.t,
+        states=solution.y,
+    )
 
     return SimulationResult(
         time=solution.t,
@@ -196,5 +286,6 @@ def solve_point_kinetics(
         title=title,
         fuel_temperature=fuel_temperature,
         moderator_temperature=moderator_temperature,
+        reactivity_components=reactivity_components,
         raw_solution=solution,
     )

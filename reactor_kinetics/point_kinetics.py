@@ -17,8 +17,15 @@ from typing import Callable
 import numpy as np
 from numpy.typing import NDArray
 
+from .thermal import (
+    ThermalFeedbackParameters,
+    ThermalParameters,
+    thermal_derivatives,
+    thermal_initial_state,
+)
 
-ReactivityFunction = Callable[[float], float]
+
+ReactivityFunction = Callable[..., float]
 
 
 @dataclass(frozen=True)
@@ -63,55 +70,6 @@ class KineticsParameters:
         return float(np.sum(self.beta))
 
 
-@dataclass(frozen=True)
-class ThermalFeedbackParameters:
-    """Lumped two-temperature thermal feedback parameters.
-
-    Temperatures are in kelvin. The power scale is arbitrary but must be
-    consistent with the heat capacities and heat transfer coefficients.
-    """
-
-    fuel_heat_capacity: float
-    moderator_heat_capacity: float
-    fuel_moderator_heat_transfer: float
-    moderator_coolant_heat_transfer: float
-    coolant_temperature: float
-    initial_fuel_temperature: float
-    initial_moderator_temperature: float
-    fuel_temperature_coefficient: float
-    moderator_temperature_coefficient: float
-    nominal_power: float = 1.0
-
-    def __post_init__(self) -> None:
-        positive_fields = {
-            "fuel_heat_capacity": self.fuel_heat_capacity,
-            "moderator_heat_capacity": self.moderator_heat_capacity,
-            "fuel_moderator_heat_transfer": self.fuel_moderator_heat_transfer,
-            "moderator_coolant_heat_transfer": self.moderator_coolant_heat_transfer,
-            "nominal_power": self.nominal_power,
-        }
-        for name, value in positive_fields.items():
-            if not np.isfinite(value) or value <= 0.0:
-                raise ValueError(f"{name} must be finite and positive.")
-
-        temperature_fields = {
-            "coolant_temperature": self.coolant_temperature,
-            "initial_fuel_temperature": self.initial_fuel_temperature,
-            "initial_moderator_temperature": self.initial_moderator_temperature,
-        }
-        for name, value in temperature_fields.items():
-            if not np.isfinite(value):
-                raise ValueError(f"{name} must be finite.")
-
-        coefficient_fields = {
-            "fuel_temperature_coefficient": self.fuel_temperature_coefficient,
-            "moderator_temperature_coefficient": self.moderator_temperature_coefficient,
-        }
-        for name, value in coefficient_fields.items():
-            if not np.isfinite(value):
-                raise ValueError(f"{name} must be finite.")
-
-
 def default_u235_parameters(Lambda: float = 1.0e-5) -> KineticsParameters:
     """Return a representative six-group U-235 delayed-neutron dataset.
 
@@ -146,38 +104,66 @@ def critical_initial_state(
     return np.concatenate(([float(n0)], precursors))
 
 
-def initial_state_with_thermal(
+def coupled_initial_state(
     params: KineticsParameters,
-    thermal_params: ThermalFeedbackParameters,
+    thermal_params: ThermalParameters,
     n0: float = 1.0,
 ) -> NDArray[np.float64]:
-    """Return a critical kinetics state with initial fuel and moderator temperatures."""
+    """Return the coupled critical kinetics plus thermal initial state."""
 
     kinetics_state = critical_initial_state(params=params, n0=n0)
-    return np.concatenate(
-        (
-            kinetics_state,
-            [
-                thermal_params.initial_fuel_temperature,
-                thermal_params.initial_moderator_temperature,
-            ],
-        )
-    )
+    fuel_temperature, moderator_temperature = thermal_initial_state(thermal_params)
+    return np.concatenate((kinetics_state, [fuel_temperature, moderator_temperature]))
+
+
+def initial_state_with_thermal(
+    params: KineticsParameters,
+    thermal_params: ThermalParameters,
+    n0: float = 1.0,
+) -> NDArray[np.float64]:
+    """Backward-compatible alias for :func:`coupled_initial_state`."""
+
+    return coupled_initial_state(params=params, thermal_params=thermal_params, n0=n0)
 
 
 def thermal_feedback_reactivity(
     fuel_temperature: float,
     moderator_temperature: float,
-    thermal_params: ThermalFeedbackParameters,
+    thermal_params: ThermalParameters,
 ) -> float:
-    """Return temperature feedback reactivity from lumped temperatures."""
+    """Return legacy thermal feedback reactivity from thermal coefficients.
+
+    Phase 4 couples temperature feedback through ``ReactivityModel`` so the
+    current ODE temperatures are part of the normal component calculation. This
+    helper remains for callers that still provide coefficients on thermal
+    parameters directly.
+    """
+
+    if (
+        thermal_params.fuel_temperature_coefficient is None
+        or thermal_params.moderator_temperature_coefficient is None
+    ):
+        return 0.0
 
     return (
         thermal_params.fuel_temperature_coefficient
-        * (fuel_temperature - thermal_params.initial_fuel_temperature)
+        * (fuel_temperature - thermal_params.reference_fuel_temperature)
         + thermal_params.moderator_temperature_coefficient
-        * (moderator_temperature - thermal_params.initial_moderator_temperature)
+        * (moderator_temperature - thermal_params.reference_moderator_temperature)
     )
+
+
+def evaluate_reactivity(
+    reactivity: ReactivityFunction,
+    t: float,
+    state: NDArray[np.float64] | None = None,
+) -> float:
+    """Evaluate old rho(t) functions and newer rho(t, state) models."""
+
+    try:
+        return float(reactivity(t, state))
+    except TypeError:
+        return float(reactivity(t))
 
 
 def point_kinetics_rhs(
@@ -190,7 +176,7 @@ def point_kinetics_rhs(
 
     n = state[0]
     precursors = state[1:7]
-    rho = float(reactivity(t))
+    rho = evaluate_reactivity(reactivity=reactivity, t=t, state=state)
 
     derivatives = np.empty(7, dtype=float)
     derivatives[0] = (
@@ -205,8 +191,8 @@ def point_kinetics_thermal_rhs(
     t: float,
     state: NDArray[np.float64],
     params: KineticsParameters,
-    external_reactivity: ReactivityFunction,
-    thermal_params: ThermalFeedbackParameters,
+    reactivity: ReactivityFunction,
+    thermal_params: ThermalParameters,
 ) -> NDArray[np.float64]:
     """Evaluate point kinetics coupled to two lumped thermal equations."""
 
@@ -215,7 +201,11 @@ def point_kinetics_thermal_rhs(
     fuel_temperature = state[7]
     moderator_temperature = state[8]
 
-    rho = float(external_reactivity(t)) + thermal_feedback_reactivity(
+    rho = evaluate_reactivity(
+        reactivity=reactivity,
+        t=t,
+        state=state,
+    ) + thermal_feedback_reactivity(
         fuel_temperature=fuel_temperature,
         moderator_temperature=moderator_temperature,
         thermal_params=thermal_params,
@@ -228,18 +218,10 @@ def point_kinetics_thermal_rhs(
     )
     derivatives[1:7] = (params.beta / params.Lambda) * n - params.lambdas * precursors
 
-    relative_power = thermal_params.nominal_power * n
-    fuel_to_moderator = thermal_params.fuel_moderator_heat_transfer * (
-        fuel_temperature - moderator_temperature
+    derivatives[7], derivatives[8] = thermal_derivatives(
+        fuel_temperature=fuel_temperature,
+        moderator_temperature=moderator_temperature,
+        neutron_population=n,
+        params=thermal_params,
     )
-    moderator_to_coolant = thermal_params.moderator_coolant_heat_transfer * (
-        moderator_temperature - thermal_params.coolant_temperature
-    )
-
-    derivatives[7] = (
-        relative_power - fuel_to_moderator
-    ) / thermal_params.fuel_heat_capacity
-    derivatives[8] = (
-        fuel_to_moderator - moderator_to_coolant
-    ) / thermal_params.moderator_heat_capacity
     return derivatives

@@ -1,0 +1,13 @@
+.DS_Store
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+validation/outputs/*.png
+!validation/outputs/.gitkeep
+
+reactivity_outputs/*.png
+!reactivity_outputs/.gitkeep
+
+thermal_outputs/*.png
+!thermal_outputs/.gitkeep
